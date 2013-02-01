@@ -12,6 +12,10 @@
 
 @interface SBPageFlowView (){
     BOOL     _needRefresh;
+    
+    BOOL     _pageTurning;
+;
+    
 }
 
 @property (nonatomic, assign, readwrite) NSInteger currentPageIndex;
@@ -62,15 +66,15 @@
     [super layoutSubviews];
     
     if (_needsReload) {
-        //如果需要重新加载数据，则需要清空相关数据全部重新加载
+        //if need reload data, reload view after clear related data
         [[_scrollView subviews] makeObjectsPerformSelector:@selector(removeFromSuperview)];
         
-        //重置pageCount
+        //reset pageCount
         if (_dataSource && [_dataSource respondsToSelector:@selector(numberOfPagesInFlowView:)]) {
             _pageCount = [_dataSource numberOfPagesInFlowView:self];
         }
         
-        //重置pageWidth
+        //reset pageWidth
         if (_dataSource && [_dataSource respondsToSelector:@selector(sizeForPageInFlowView:)]) {
             _pageSize = [_dataSource sizeForPageInFlowView:self];
         }
@@ -85,7 +89,7 @@
             [_scrollView addSubview:self.defaultImageView];
         }
         
-        // 重置_scrollView的contentSize
+        //reset contentSize of _scrollView
         NSInteger  offset = 1;
         _scrollView.scrollEnabled = YES;
         if (_pageCount <= 1) {
@@ -492,6 +496,12 @@
 
 - (void)scrollToNextPage
 {
+    if (_pageTurning) {
+        return;
+    }
+    
+    _pageTurning = YES;
+    
     UIView *newItem = [[_reusableCells lastObject] retain];
     newItem.frame = CGRectMake(_pageSize.width*3, 0, _pageSize.width, _pageSize.height);
     [_reusableCells removeObjectIdenticalTo:newItem];
@@ -501,6 +511,10 @@
     UIView  *oldItem = [[_inUseCells objectAtIndex:0] retain];
     
     _currentPageIndex = [self validPageValue:_currentPageIndex+1];
+    
+    if ([_delegate respondsToSelector:@selector(didScrollToPage:inFlowView:)]) {
+        [_delegate didScrollToPage:_currentPageIndex inFlowView:self];
+    }
     
     [UIView animateWithDuration:0.5f
                      animations:^{
@@ -515,6 +529,7 @@
                          [newItem release];
                          
                          oldItem.frame = CGRectMake(0, 0, _pageSize.width, _pageSize.height);
+                         
                          [_reusableCells insertObject:oldItem atIndex:0];
                          [oldItem removeFromSuperview];
                          [oldItem release];
@@ -532,6 +547,8 @@
                          reuseCell.tag = index + kTagOffset;
                          reuseCell.frame = CGRectMake(_pageSize.width*2, 0, _pageSize.width, _pageSize.height);
                          [_delegate didReloadData:reuseCell cellForPageAtIndex:index];
+                         
+                         _pageTurning = NO;
                          
                      }];
     
